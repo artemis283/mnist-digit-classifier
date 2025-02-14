@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    ports:
+      - "8000:8000"
+    networks:
+      - app-network
+
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: mnist_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+      - db
+    networks:
+      - app-network
+
+volumes:
+  db-data:
+
+networks:
+  app-network:

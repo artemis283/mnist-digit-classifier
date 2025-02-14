@@ -48,7 +48,7 @@ if canvas.image_data is not None:
     image = np.resize(image, (28, 28)).astype(np.float32) / 255.0
     if st.button("Predict"):
         response = requests.post(
-            "http://127.0.0.1:8000/predict",
+            "http://api:8000/predict",
             json={"image": image.tolist()},
         )
         if response.status_code == 200:
