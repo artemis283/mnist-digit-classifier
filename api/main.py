@@ -1,21 +1,18 @@
-# api/main.py
 import torch
 import torch.nn.functional as F
 from fastapi import FastAPI
 from pydantic import BaseModel
 import numpy as np
 
-# Load Model
 from model.train import DigitClassifier
 model = DigitClassifier()
 model.load_state_dict(torch.load("mnist_cnn.pth"))
 model.eval()
 
-# Ensure the app object is created
 app = FastAPI()
 
 class DigitRequest(BaseModel):
-    image: list  # Expecting a 28x28 list of pixel values
+    image: list
 
 @app.post("/predict")
 def predict(request: DigitRequest):
