@@ -1,51 +1,82 @@
+import os
 import torch
-from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import torch.nn as nn
+from PIL import Image
+import numpy as np
+import matplotlib.pyplot as plt
+from torchvision import transforms
+import cv2
 
-# Testing accuracy of model and loading trained model
-# Load trained model
 class DigitClassifier(nn.Module):
     def __init__(self):
         super(DigitClassifier, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3, 1)
-        self.conv2 = nn.Conv2d(32, 64, 3, 1)
-        self.fc1 = nn.Linear(64 * 24 * 24, 128)
-        self.fc2 = nn.Linear(128, 10)
+        # Flatten layer is implicit in PyTorch; we use Linear layers
+        self.fc1 = nn.Linear(28 * 28, 128)  # First fully connected layer (input is 28x28)
+        self.fc2 = nn.Linear(128, 128)      # Second fully connected layer
+        self.fc3 = nn.Linear(128, 10)       # Output layer (10 classes for digits 0-9)
 
     def forward(self, x):
-        x = torch.relu(self.conv1(x))
-        x = torch.relu(self.conv2(x))
-        x = torch.flatten(x, 1)
-        x = torch.relu(self.fc1(x))
-        x = self.fc2(x)
+        # Flatten the image (28x28 to 784) and apply ReLU activations
+        x = torch.flatten(x, 1)  # Flattening all dimensions except batch
+        x = torch.relu(self.fc1(x))  # First hidden layer
+        x = torch.relu(self.fc2(x))  # Second hidden layer
+        x = self.fc3(x)  # Output layer (no activation here, we'll apply softmax in the loss function)
         return x
 
-# Load model
+# Load the trained model
 model = DigitClassifier()
 model.load_state_dict(torch.load("mnist_cnn.pth"))
 model.eval()  # Set to evaluation mode
 
-# Load test data
-transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
-test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
+# Print model parameters after loading the weights
+for name, param in model.named_parameters():
+    if param.requires_grad:
+        print(f"Layer {name}, Shape: {param.shape}")
 
-# Test on 100 samples
+
+# Image transformation (to match model's input format)
+transform = transforms.Compose([
+    transforms.Grayscale(num_output_channels=1),  # Ensure the image is in grayscale
+    transforms.Resize((28, 28)),  # Resize the image to 28x28
+    transforms.ToTensor(),  # Convert image to tensor
+    transforms.Normalize((0.5,), (0.5,))  # Normalize to the same range as training data
+])
+
+# Load and test hand-drawn images
+image_number = 1
 correct = 0
-total = 100
+total = 11
 
-for i, (image, label) in enumerate(test_loader):
-    if i >= total:  # Stop after 100 runs
-        break
-    output = model(image)
-    predicted_label = torch.argmax(output, dim=1).item()
-    
-    print(f"Sample {i+1}: Actual label: {label.item()}, Predicted label: {predicted_label}")
+# Load custom images and predict them
+while os.path.isfile('/Users/artemiswebster/source/mnist-digit-classifier/digit/digit{}.png'.format(image_number)):
+    try:
+        # Read the image
+        img = cv2.imread('/Users/artemiswebster/source/mnist-digit-classifier/digit/digit{}.png'.format(image_number), cv2.IMREAD_GRAYSCALE)
+        
+        if img is None:
+            print("Error reading image! Proceeding with next image...")
+            image_number += 1
+            continue
 
-    if predicted_label == label.item():
-        correct += 1
+        # Apply the transformations (resize, normalize, convert to tensor)
+        img_transformed = transform(Image.fromarray(img))
+        
+        # Add batch dimension
+        img_transformed = img_transformed.unsqueeze(0)
 
-# Print accuracy
-accuracy = (correct / total) * 100
-print(f"Accuracy over {total} samples: {accuracy:.2f}%")
+        # Make prediction
+        with torch.no_grad():
+            output = model(img_transformed)
+            _, predicted = torch.max(output, 1)
+
+        print(f"The number is probably a {predicted.item()}")
+
+        # Display the image
+        plt.imshow(img, cmap=plt.cm.binary)
+        plt.show()
+
+        image_number += 1
+    except Exception as e:
+        print(f"Error: {e}. Proceeding with next image...")
+        image_number += 1
