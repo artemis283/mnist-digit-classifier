@@ -3,6 +3,7 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import torch.nn as nn
 
+# Testing accuracy of model and loading trained model
 # Load trained model
 class DigitClassifier(nn.Module):
     def __init__(self):

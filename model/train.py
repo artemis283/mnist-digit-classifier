@@ -7,9 +7,23 @@ import ssl
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
-transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
+# testing code
+
+# New transform with data augmentation for training data
+transform = transforms.Compose([
+    transforms.RandomRotation(10),  # Randomly rotate digits by up to 10 degrees
+    transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),  # Randomly translate
+    transforms.ToTensor(),
+    transforms.Normalize((0.5,), (0.5,))
+])
+
+# Apply the new transform for training and the original one (no augmentation) for testing
 train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize((0.5,), (0.5,))
+]))
+
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 

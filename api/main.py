@@ -3,6 +3,8 @@ import torch.nn.functional as F
 from fastapi import FastAPI
 from pydantic import BaseModel
 import numpy as np
+import torch.nn as nn
+
 class DigitClassifier(nn.Module):
     def __init__(self):
         super(DigitClassifier, self).__init__()
@@ -19,8 +21,11 @@ class DigitClassifier(nn.Module):
         x = self.fc2(x)
         return x
     
+state_dict = torch.load("mnist_cnn.pth")  
+print(state_dict.keys()) 
+
 model = DigitClassifier()
-model.load_state_dict(torch.load("mnist_cnn.pth"))
+model.load_state_dict(state_dict)
 model.eval()
 
 app = FastAPI()
@@ -31,6 +36,7 @@ class DigitRequest(BaseModel):
 @app.post("/predict")
 def predict(request: DigitRequest):
     image = torch.tensor(request.image, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+    print(f"Input shape: {image.shape}") 
     with torch.no_grad():
         output = model(image)
         probabilities = F.softmax(output, dim=1)
