@@ -47,7 +47,7 @@ PennyLane==0.40.0
 PennyLane_Lightning==0.40.0
 pillow==10.4.0
 protobuf==5.29.3
-psycopg2==2.9.10
+psycopg2-binary==2.9.10
 PuLP==2.9.0
 pyarrow==19.0.0
 pydantic==2.8.2
