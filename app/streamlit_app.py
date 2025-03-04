@@ -15,6 +15,7 @@ DB_PARAMS = {
 }
 
 def log_prediction(predicted_digit, true_label):
+    """Logs predictions into PostgreSQL database."""
     try:
         conn = psycopg2.connect(**DB_PARAMS)
         cur = conn.cursor()
@@ -27,6 +28,20 @@ def log_prediction(predicted_digit, true_label):
         conn.close()
     except Exception as e:
         st.error(f"Database error: {e}")
+
+def fetch_history():
+    """Fetches all past predictions from the database."""
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        cur = conn.cursor()
+        cur.execute("SELECT timestamp, predicted_digit, true_label FROM predictions ORDER BY timestamp DESC;")
+        history = cur.fetchall()
+        cur.close()
+        conn.close()
+        return history
+    except Exception as e:
+        st.error(f"Error fetching history: {e}")
+        return []
 
 # Streamlit UI
 st.title("🧮 MNIST Digit Classifier")
@@ -46,6 +61,7 @@ canvas = st_canvas(
 if canvas.image_data is not None:
     image = np.mean(canvas.image_data[:, :, :3], axis=2)  # Convert to grayscale
     image = np.resize(image, (28, 28)).astype(np.float32) / 255.0
+    
     if st.button("Predict"):
         response = requests.post(
             "http://api:8000/predict",
@@ -60,5 +76,17 @@ if canvas.image_data is not None:
             if st.button("Submit Feedback"):
                 log_prediction(result['predicted_digit'], true_label)
                 st.success("Feedback submitted.")
-        else:
-            st.error("Prediction service error.")
+
+# Display Prediction History
+# Display Prediction History
+st.subheader("📜 Prediction History")
+
+history = fetch_history()
+
+if history:
+    st.table(
+        [{"Timestamp": row[0], "Prediction": row[1], "True Label": row[2]} for row in history]
+    )
+else:
+    st.write("No history available yet.")
+

@@ -4,77 +4,100 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 
-# Define the PyTorch model (similar to the TensorFlow model)
-class DigitClassifier(nn.Module):
+# Define the CNN-based classifier
+class CNNClassifier(nn.Module):
     def __init__(self):
-        super(DigitClassifier, self).__init__()
-        # Flatten layer is implicit in PyTorch; we use Linear layers
-        self.fc1 = nn.Linear(28 * 28, 128)  # First fully connected layer (input is 28x28)
-        self.fc2 = nn.Linear(128, 128)      # Second fully connected layer
-        self.fc3 = nn.Linear(128, 10)       # Output layer (10 classes for digits 0-9)
+        super(CNNClassifier, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)  # Batch normalization
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.fc1 = nn.Linear(64 * 7 * 7, 128)  # Fully connected layer
+        self.fc2 = nn.Linear(128, 10)  # Output layer
 
     def forward(self, x):
-        # Flatten the image (28x28 to 784) and apply ReLU activations
-        x = torch.flatten(x, 1)  # Flattening all dimensions except batch
-        x = torch.relu(self.fc1(x))  # First hidden layer
-        x = torch.relu(self.fc2(x))  # Second hidden layer
-        x = self.fc3(x)  # Output layer (no activation here, we'll apply softmax in the loss function)
+        x = torch.relu(self.bn1(self.conv1(x)))
+        x = torch.max_pool2d(x, 2)  # Downsample to 14x14
+        x = torch.relu(self.bn2(self.conv2(x)))
+        x = torch.max_pool2d(x, 2)  # Downsample to 7x7
+        x = torch.flatten(x, 1)  # Flatten feature maps
+        x = torch.relu(self.fc1(x))
+        x = self.fc2(x)  # No activation (softmax applied in loss function)
         return x
 
-# Data preprocessing and augmentation
+# Data augmentation for training
 transform_train = transforms.Compose([
-    transforms.RandomRotation(10),  # Randomly rotate digits by up to 10 degrees
-    transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),  # Randomly translate
+    transforms.RandomRotation(10),  # Rotate by ±10 degrees
+    transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),  # Shift by ±10%
+    transforms.RandomPerspective(distortion_scale=0.1, p=0.5),  # Random perspective distortions
     transforms.ToTensor(),
-    transforms.Normalize((0.5,), (0.5,))  # Normalize with mean and std
+    transforms.Normalize((0.5,), (0.5,))
 ])
 
+# Normal transformation for test data (no augmentation)
 transform_test = transforms.Compose([
     transforms.ToTensor(),
-    transforms.Normalize((0.5,), (0.5,))  # Normalize with mean and std
+    transforms.Normalize((0.5,), (0.5,))
 ])
 
-# Load the MNIST dataset
+# Load datasets
 train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform_train)
 test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform_test)
 
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
-# Create the model instance
-model = DigitClassifier()
-
-# Set up the loss function and optimizer
-criterion = nn.CrossEntropyLoss()  # CrossEntropyLoss includes softmax internally
+# Create model, loss function, and optimizer
+model = CNNClassifier()
+criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-# Training loop
-epochs = 3
+# Learning rate scheduler (adjusts LR over epochs)
+scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.7)
+
+# Training loop with accuracy tracking
+epochs = 10
 for epoch in range(epochs):
     model.train()
-    for images, labels in train_loader:
-        optimizer.zero_grad()  # Zero the gradients
-        outputs = model(images)  # Get model predictions
-        loss = criterion(outputs, labels)  # Compute the loss
-        loss.backward()  # Backpropagate the gradients
-        optimizer.step()  # Update the weights
+    total_loss = 0
+    correct = 0
+    total = 0
 
-    print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item()}")
+    for images, labels in train_loader:
+        optimizer.zero_grad()
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        total_loss += loss.item()
+
+        # Track training accuracy
+        _, predicted = torch.max(outputs, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+
+    # Update learning rate
+    scheduler.step()
+
+    # Print epoch results
+    print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(train_loader):.4f}, Accuracy: {100 * correct / total:.2f}%")
 
 # Save the trained model
 torch.save(model.state_dict(), 'mnist_cnn.pth')
 print("Model trained and saved as mnist_cnn.pth")
 
-# Evaluating the model
-model.eval()  # Set to evaluation mode
+# Evaluate model on test set
+model.eval()
 correct = 0
 total = 0
-with torch.no_grad():  # No need to compute gradients during inference
+with torch.no_grad():
     for images, labels in test_loader:
         outputs = model(images)
-        _, predicted = torch.max(outputs, 1)  # Get the predicted class
+        _, predicted = torch.max(outputs, 1)
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
 
-print(f'Accuracy on test set: {100 * correct / total:.2f}%')
+print(f'Final Test Accuracy: {100 * correct / total:.2f}%')
+
 
