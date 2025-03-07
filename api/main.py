@@ -5,6 +5,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import numpy as np
 import psycopg2
+import random
+import os
 
 # Database Connection
 DB_PARAMS = {
@@ -13,6 +15,18 @@ DB_PARAMS = {
     "user": "postgres",
     "password": "password"
 }
+
+def set_seed(seed=42):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+set_seed()
 
 # Define the CNN-based classifier
 class CNNClassifier(nn.Module):
@@ -35,10 +49,10 @@ class CNNClassifier(nn.Module):
         x = self.fc2(x)
         return x
 
-# Load trained model
-model = CNNClassifier()
+
 try:
-    state_dict = torch.load("/model/mnist_cnn.pth", map_location=torch.device('cpu'))
+    model = CNNClassifier()
+    state_dict = torch.load("/app/mnist_cnn.pth", map_location=torch.device('cpu'))
     model.load_state_dict(state_dict)
     model.eval()
 except Exception as e:

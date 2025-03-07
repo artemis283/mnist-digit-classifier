@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
+import numpy as np
 
 # Define the CNN-based classifier
 class CNNClassifier(nn.Module):
@@ -46,6 +47,21 @@ test_dataset = datasets.MNIST(root='./data', train=False, download=True, transfo
 
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
+
+# Get a single image from the dataset
+image, label = next(iter(test_loader))
+
+# Convert image to numpy array for easier manipulation
+image_np = image.numpy().squeeze()  # Remove the extra channel dimension
+
+# Print min and max pixel values
+print(f"Min pixel value: {image_np.min()}")
+print(f"Max pixel value: {image_np.max()}")
+
+print(f"Data type before processing: {image_np.dtype}")  # Check before any processing (it should be float32 due to ToTensor())
+# If you want to confirm the image is in float32 after ToTensor()
+image = image_np.astype(np.float32) / 255.0  # Rescale between 0 and 1 if needed
+print(f"Data type after processing: {image.dtype}")  # Should be float32
 
 # Create model, loss function, and optimizer
 model = CNNClassifier()

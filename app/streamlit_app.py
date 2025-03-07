@@ -5,6 +5,7 @@ import requests
 import numpy as np
 import psycopg2
 from datetime import datetime
+from PIL import Image
 
 # Database Connection
 DB_PARAMS = {
@@ -59,9 +60,35 @@ canvas = st_canvas(
 )
 
 if canvas.image_data is not None:
-    image = np.mean(canvas.image_data[:, :, :3], axis=2)  # Convert to grayscale
-    image = np.resize(image, (28, 28)).astype(np.float32) / 255.0
-    
+    # Convert to grayscale (only RGB channels, ignore alpha)
+    image = np.mean(canvas.image_data[:, :, :3], axis=2).astype(np.uint8)
+
+    # Print min/max before processing
+    st.write(f"Image Range after Grayscale Conversion: Min = {image.min()}, Max = {image.max()}")
+
+    # Convert to PIL image and resize
+    image = Image.fromarray(image)
+    image = image.resize((28, 28), Image.Resampling.LANCZOS)
+    image = np.array(image).astype(np.float32)
+
+    # Convert grayscale image to range [0, 1]
+    image = image / 255.0
+
+    # Ensure min/max are within [0, 1] (just in case)
+    image = np.clip(image, 0.0, 1.0)
+
+    st.write(f"Image Range after Normalizing to [0, 1]: Min = {image.min()}, Max = {image.max()}")
+
+    # Normalize to [-1, 1] for model input
+    image = 2 * image - 1  # This keeps it between -1 and 1
+
+    # Ensure final normalization is within expected range
+    image = np.clip(image, -1.0, 1.0)
+
+    # Final debug info
+    st.write(f"Image Range after Normalizing to [-1, 1]: Min = {image.min()}, Max = {image.max()}")
+
+
     if st.button("Predict"):
         response = requests.post(
             "http://api:8000/predict",
@@ -78,7 +105,6 @@ if canvas.image_data is not None:
                 st.success("Feedback submitted.")
 
 # Display Prediction History
-# Display Prediction History
 st.subheader("📜 Prediction History")
 
 history = fetch_history()
@@ -89,4 +115,6 @@ if history:
     )
 else:
     st.write("No history available yet.")
+
+
 
