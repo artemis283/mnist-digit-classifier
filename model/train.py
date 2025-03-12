@@ -5,35 +5,80 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import numpy as np
 
-# Define the CNN-based classifier
-class CNNClassifier(nn.Module):
+# Define the improved CNN-based classifier
+class ImprovedCNNClassifier(nn.Module):
     def __init__(self):
-        super(CNNClassifier, self).__init__()
+        super(ImprovedCNNClassifier, self).__init__()
+        # First convolutional block
         self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(32)  # Batch normalization
+        self.bn1 = nn.BatchNorm2d(32)
+        
+        # Second convolutional block
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm2d(64)
-        self.fc1 = nn.Linear(64 * 7 * 7, 128)  # Fully connected layer
-        self.fc2 = nn.Linear(128, 10)  # Output layer
-
+        
+        # Third convolutional block (additional)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(64)
+        
+        # Fully connected layers
+        self.fc1 = nn.Linear(64 * 3 * 3, 128)
+        self.dropout = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(128, 10)
+        
     def forward(self, x):
-        x = torch.relu(self.bn1(self.conv1(x)))
-        x = torch.max_pool2d(x, 2)  # Downsample to 14x14
-        x = torch.relu(self.bn2(self.conv2(x)))
-        x = torch.max_pool2d(x, 2)  # Downsample to 7x7
-        x = torch.flatten(x, 1)  # Flatten feature maps
-        x = torch.relu(self.fc1(x))
-        x = self.fc2(x)  # No activation (softmax applied in loss function)
+        # First block
+        x = self.bn1(self.conv1(x))
+        x = torch.relu(x)
+        x = torch.max_pool2d(x, 2)  # 28x28 -> 14x14
+        
+        # Second block
+        x = self.bn2(self.conv2(x))
+        x = torch.relu(x)
+        x = torch.max_pool2d(x, 2)  # 14x14 -> 7x7
+        
+        # Third block
+        x = self.bn3(self.conv3(x))
+        x = torch.relu(x)
+        x = torch.max_pool2d(x, 2)  # 7x7 -> 3x3
+        
+        # Flatten and fully connected
+        x = torch.flatten(x, 1)
+        x = self.fc1(x)
+        x = torch.relu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        
         return x
 
 # Data augmentation for training
 transform_train = transforms.Compose([
-    transforms.RandomRotation(10),  # Rotate by ±10 degrees
-    transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),  # Shift by ±10%
-    transforms.RandomPerspective(distortion_scale=0.1, p=0.5),  # Random perspective distortions
+    # Spatial transformations
+    transforms.RandomRotation(15),  # Increased rotation range to ±15 degrees
+    transforms.RandomAffine(
+        degrees=10,  
+        translate=(0.15, 0.15),  # Increased translation range to 15%
+        scale=(0.85, 1.15),  # Add random scaling between 85% and 115%
+        shear=10  # Add shearing transformation
+    ),
+    transforms.RandomPerspective(distortion_scale=0.2, p=0.5),  # Increased perspective distortion
+    
+    # Elastic transformations (simulates hand-writing variations)
+    transforms.ElasticTransform(alpha=1.0, sigma=0.5),
+    
+    # Noise and blur to simulate different writing instruments
+    transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 1.0)),
+    
+    # Convert to tensor and normalize
     transforms.ToTensor(),
-    transforms.Normalize((0.5,), (0.5,))
+    transforms.Normalize((0.5,), (0.5,)),
+    
+    # Add random noise occasionally 
+    transforms.RandomApply([
+        transforms.Lambda(lambda x: x + 0.05 * torch.randn_like(x))
+    ], p=0.3)
 ])
+
 
 # Normal transformation for test data (no augmentation)
 transform_test = transforms.Compose([
@@ -44,69 +89,88 @@ transform_test = transforms.Compose([
 # Load datasets
 train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform_train)
 test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform_test)
-
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
-# Get a single image from the dataset
-image, label = next(iter(test_loader))
-
-# Convert image to numpy array for easier manipulation
-image_np = image.numpy().squeeze()  # Remove the extra channel dimension
-
-# Print min and max pixel values
-print(f"Min pixel value: {image_np.min()}")
-print(f"Max pixel value: {image_np.max()}")
-
-print(f"Data type before processing: {image_np.dtype}")  # Check before any processing (it should be float32 due to ToTensor())
-# If you want to confirm the image is in float32 after ToTensor()
-image = image_np.astype(np.float32) / 255.0  # Rescale between 0 and 1 if needed
-print(f"Data type after processing: {image.dtype}")  # Should be float32
-
 # Create model, loss function, and optimizer
-model = CNNClassifier()
+model = ImprovedCNNClassifier()
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)  # Added weight decay
 
-# Learning rate scheduler (adjusts LR over epochs)
-scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.7)
+# Better learning rate scheduler
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2)
 
 # Training loop with accuracy tracking
-epochs = 10
+epochs = 20  # Increased epochs
+best_acc = 0
+
 for epoch in range(epochs):
+    # Training phase
     model.train()
     total_loss = 0
     correct = 0
     total = 0
-
+    
     for images, labels in train_loader:
         optimizer.zero_grad()
         outputs = model(images)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
-
+        
         total_loss += loss.item()
-
+        
         # Track training accuracy
         _, predicted = torch.max(outputs, 1)
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
+    
+    train_acc = 100 * correct / total
+    avg_loss = total_loss / len(train_loader)
+    
+    # Print training results
+    print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.4f}, Train Accuracy: {train_acc:.2f}%")
+    
+    # Validation phase
+    model.eval()
+    val_loss = 0
+    correct = 0
+    total = 0
+    
+    with torch.no_grad():
+        for images, labels in test_loader:
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            val_loss += loss.item()
+            
+            _, predicted = torch.max(outputs, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+        
+    val_acc = 100 * correct / total
+    avg_val_loss = val_loss / len(test_loader)
+    
+    print(f"Validation Loss: {avg_val_loss:.4f}, Validation Accuracy: {val_acc:.2f}%")
+    
+    # Update scheduler based on validation loss
+    scheduler.step(avg_val_loss)
+    
+    # Save best model
+    if val_acc > best_acc:
+        best_acc = val_acc
+        torch.save(model.state_dict(), 'best_mnist_cnn.pth')
+        print(f"New best model saved with accuracy: {best_acc:.2f}%")
 
-    # Update learning rate
-    scheduler.step()
+print(f"Training complete. Best validation accuracy: {best_acc:.2f}%")
 
-    # Print epoch results
-    print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(train_loader):.4f}, Accuracy: {100 * correct / total:.2f}%")
+# Load the best model for final evaluation
+model.load_state_dict(torch.load('best_mnist_cnn.pth'))
 
-# Save the trained model
-torch.save(model.state_dict(), 'mnist_cnn.pth')
-print("Model trained and saved as mnist_cnn.pth")
-
-# Evaluate model on test set
+# Final evaluation on test set
 model.eval()
 correct = 0
 total = 0
+
 with torch.no_grad():
     for images, labels in test_loader:
         outputs = model(images)
@@ -114,6 +178,6 @@ with torch.no_grad():
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
 
-print(f'Final Test Accuracy: {100 * correct / total:.2f}%')
-
+final_acc = 100 * correct / total
+print(f'Final Test Accuracy: {final_acc:.2f}%')
 

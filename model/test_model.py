@@ -8,35 +8,55 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 import cv2
 
-# Define CNN-based model (matches a strong TensorFlow model)
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
 # Define CNN-based model with batch normalization (to match training model)
-class CNNClassifier(nn.Module):
+class ImprovedCNNClassifier(nn.Module):
     def __init__(self):
-        super(CNNClassifier, self).__init__()
+        super(ImprovedCNNClassifier, self).__init__()
+        # First convolutional block
         self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(32)  # Add batch normalization
+        self.bn1 = nn.BatchNorm2d(32)
+        
+        # Second convolutional block
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(64)  # Add batch normalization
-        self.fc1 = nn.Linear(64 * 7 * 7, 128)
+        self.bn2 = nn.BatchNorm2d(64)
+        
+        # Third convolutional block (additional)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(64)
+        
+        # Fully connected layers
+        self.fc1 = nn.Linear(64 * 3 * 3, 128)
+        self.dropout = nn.Dropout(0.5)
         self.fc2 = nn.Linear(128, 10)
-
+        
     def forward(self, x):
-        x = F.relu(self.bn1(self.conv1(x)))  # Apply batch norm
-        x = F.max_pool2d(x, 2)
-        x = F.relu(self.bn2(self.conv2(x)))  # Apply batch norm
-        x = F.max_pool2d(x, 2)
+        # First block
+        x = self.bn1(self.conv1(x))
+        x = torch.relu(x)
+        x = torch.max_pool2d(x, 2)  # 28x28 -> 14x14
+        
+        # Second block
+        x = self.bn2(self.conv2(x))
+        x = torch.relu(x)
+        x = torch.max_pool2d(x, 2)  # 14x14 -> 7x7
+        
+        # Third block
+        x = self.bn3(self.conv3(x))
+        x = torch.relu(x)
+        x = torch.max_pool2d(x, 2)  # 7x7 -> 3x3
+        
+        # Flatten and fully connected
         x = torch.flatten(x, 1)
-        x = F.relu(self.fc1(x))
+        x = self.fc1(x)
+        x = torch.relu(x)
+        x = self.dropout(x)
         x = self.fc2(x)
+        
         return x
 
 # Load trained model
-model = CNNClassifier()
-model.load_state_dict(torch.load("mnist_cnn.pth"))
+model = ImprovedCNNClassifier()
+model.load_state_dict(torch.load("best_mnist_cnn.pth"))
 model.eval()
 
 
