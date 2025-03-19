@@ -56,7 +56,7 @@ class ImprovedCNNClassifier(nn.Module):
 
 # Load trained model
 model = ImprovedCNNClassifier()
-model.load_state_dict(torch.load("best_mnist_cnn.pth"))
+model.load_state_dict(torch.load("online_best_mnist_cnn.pth"))
 model.eval()
 
 

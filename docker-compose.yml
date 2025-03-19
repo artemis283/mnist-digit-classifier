@@ -1,5 +1,4 @@
 version: '3.8'
-
 services:
   api:
     build:
@@ -9,7 +8,8 @@ services:
       - "8000:8000"
     networks:
       - app-network
-
+    volumes:
+      - ./models:/app/models
   db:
     image: postgres:13
     environment:
@@ -18,11 +18,11 @@ services:
       POSTGRES_PASSWORD: password
     volumes:
       - db-data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5433:5432"
     networks:
       - app-network
-
   streamlit:
     build:
       context: .
@@ -34,9 +34,7 @@ services:
       - db
     networks:
       - app-network
-
 volumes:
   db-data:
-
 networks:
   app-network:

@@ -101,7 +101,7 @@ optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)  # Added
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2)
 
 # Training loop with accuracy tracking
-epochs = 20  # Increased epochs
+epochs = 5  # Increased epochs
 best_acc = 0
 
 for epoch in range(epochs):
@@ -159,6 +159,7 @@ for epoch in range(epochs):
     if val_acc > best_acc:
         best_acc = val_acc
         torch.save(model.state_dict(), 'best_mnist_cnn.pth')
+        torch.save(model, 'best_mnist_cnn_full.pth')
         print(f"New best model saved with accuracy: {best_acc:.2f}%")
 
 print(f"Training complete. Best validation accuracy: {best_acc:.2f}%")
