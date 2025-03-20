@@ -1,5 +1,4 @@
 digit
-test_model.py
 mnist_cnn.pth
 online_best_mnist_cnn.pth
 debug_image.png

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 import cv2
 
-# Define CNN-based model with batch normalization (to match training model)
+
 class ImprovedCNNClassifier(nn.Module):
     def __init__(self):
         super(ImprovedCNNClassifier, self).__init__()
@@ -131,7 +131,7 @@ while os.path.isfile(f"/Users/artemiswebster/source/mnist-digit-classifier/digit
         plt.show()
 
         # Track accuracy
-        if predicted == int(img_path[-5]):  # Compare with actual label (assuming last digit in filename is true label)
+        if predicted == int(img_path[-5]):  
             correct_predictions += 1
 
         image_number += 1
