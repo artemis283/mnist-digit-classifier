@@ -40,13 +40,11 @@ def process_image(image_data, size=28):
     # Convert image to grayscale
     grayscale_image = np.mean(image_data[:, :, :3], axis=2)
     
-    # Resize image
     resized_image = zoom(grayscale_image, size / grayscale_image.shape[0])
     
     # Normalize pixel values
     normalized_image = resized_image.astype(np.float32) / 255
-    
-    # Return image as a 2D array (not reshaped to a single row)
+
     return normalized_image
 
 def fetch_history():
@@ -79,7 +77,6 @@ def main():
         key="canvas",
     )
 
-    # Use a session state to track prediction result
     if 'prediction_result' not in st.session_state:
         st.session_state.prediction_result = None
 
@@ -88,11 +85,11 @@ def main():
         image = process_image(canvas.image_data)
         
         # Display the processed image
-        st.write(f"Image Range: Min = {image.min()}, Max = {image.max()}")
+        # st.write(f"Image Range: Min = {image.min()}, Max = {image.max()}")
         
         # Create a larger version for display
-        display_img = Image.fromarray((image * 255).astype(np.uint8)).resize((140, 140), Image.NEAREST)
-        st.image(display_img, caption="Processed Image (28x28)")
+        # display_img = Image.fromarray((image * 255).astype(np.uint8)).resize((140, 140), Image.NEAREST)
+        # st.image(display_img, caption="Processed Image (28x28)")
         
         # Predict button
         if st.button("Predict"):

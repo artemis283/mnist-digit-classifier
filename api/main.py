@@ -21,7 +21,6 @@ def set_seed(seed=42):
 
 set_seed()
 
-# Define the CNN-based classifier
 class ImprovedCNNClassifier(nn.Module):
     def __init__(self):
         super(ImprovedCNNClassifier, self).__init__()
@@ -80,24 +79,21 @@ def preprocess_image(image_array):
         import numpy as np
         import torch
         import os
-        
-        # Convert to numpy if it's a list
+    
         if isinstance(image_array, list):
             image_array = np.array(image_array, dtype=np.float32)
-        
-        # Convert to tensor
+
         image_tensor = torch.tensor(image_array, dtype=torch.float32)
         
-        # Log input statistics
+
         print(f"Input min: {image_tensor.min()}, max: {image_tensor.max()}, mean: {image_tensor.mean()}")
         
-        # Normalize to [0,1] range if coming in as [-1,1]
+  
         if image_tensor.min() < 0:
             image_tensor = (image_tensor + 1) / 2.0
         
-        # Optional: Save debug image without requiring matplotlib
+
         try:
-            # Create debug directory if it doesn't exist
             os.makedirs("/app/debug", exist_ok=True)
             
             # Save as a simple text file for debugging (no matplotlib required)
@@ -125,7 +121,7 @@ def preprocess_image(image_array):
         raise HTTPException(status_code=500, detail=f"Preprocessing error: {str(e)}")
 
 
-# Load the model once on startup
+
 model = None
 try:
     model_path = "/app/best_mnist_cnn.pth"
@@ -153,7 +149,6 @@ except Exception as e:
 @app.post("/predict")
 def predict(request: DigitRequest):
     try:
-        # Process the image
         image_tensor = preprocess_image(request.image)
         
         
@@ -197,93 +192,7 @@ def predict(request: DigitRequest):
         print(f"Prediction error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
-# Health check endpoint
-@app.get("/health")
-def health_check():
-    # List all files in the /app directory to help locate model files
-    files_in_app = []
-    try:
-        if os.path.exists("/app"):
-            files_in_app = [f for f in os.listdir("/app") if f.endswith(".pth")]
-    except Exception as e:
-        files_in_app = ["Error listing files: " + str(e)]
-    
-    # Also check current directory
-    current_dir_files = []
-    try:
-        current_dir_files = [f for f in os.listdir(".") if f.endswith(".pth")]
-    except Exception as e:
-        current_dir_files = ["Error listing files: " + str(e)]
-    
-    return {
-        "status": "ok",
-        "model_loaded": model is not None,
-        "files_in_app_dir": files_in_app,
-        "files_in_current_dir": current_dir_files,
-        "current_working_dir": os.getcwd()
-    }
 
-# New endpoint to test the model with sample digits
-@app.get("/test_model")
-def test_model():
-    if model is None:
-        return {"error": "Model not loaded"}
-    
-    results = []
-    
-    # Create simple test patterns for digits 0-9
-    test_patterns = []
-    
-    # Digit 0: Circle
-    pattern0 = np.zeros((28, 28), dtype=np.float32)
-    for i in range(28):
-        for j in range(28):
-            if ((i-14)**2 + (j-14)**2 < 100) and ((i-14)**2 + (j-14)**2 > 36):
-                pattern0[i, j] = 1.0
-    test_patterns.append(("digit_0", pattern0))
-    
-    # Digit 1: Vertical line
-    pattern1 = np.zeros((28, 28), dtype=np.float32)
-    pattern1[5:23, 14:16] = 1.0
-    test_patterns.append(("digit_1", pattern1))
-    
-    # Digit 2: Simple 2 shape
-    pattern2 = np.zeros((28, 28), dtype=np.float32)
-    pattern2[5:7, 8:20] = 1.0     # Top horizontal
-    pattern2[5:14, 18:20] = 1.0   # Right vertical
-    pattern2[12:14, 8:20] = 1.0   # Middle horizontal
-    pattern2[14:22, 8:10] = 1.0   # Bottom left vertical
-    pattern2[20:22, 8:20] = 1.0   # Bottom horizontal
-    test_patterns.append(("digit_2", pattern2))
-    
-    # Process each test pattern
-    for name, pattern in test_patterns:
-        try:
-            # Convert to tensor and preprocess
-            raw_tensor = torch.from_numpy(pattern)
-            # Standard MNIST normalization
-            input_tensor = ((raw_tensor - 0.1307) / 0.3081).unsqueeze(0).unsqueeze(0)
-            
-            # Get prediction
-            with torch.no_grad():
-                output = model(input_tensor)
-                probabilities = F.softmax(output, dim=1)
-                confidence, predicted = torch.max(probabilities, 1)
-                
-                results.append({
-                    "pattern": name,
-                    "predicted": int(predicted.item()),
-                    "confidence": float(confidence.item()),
-                    "probabilities": [float(p) for p in probabilities[0].tolist()]
-                })
-        except Exception as e:
-            results.append({
-                "pattern": name,
-                "error": str(e)
-            })
-    
-    return {"test_results": results}
-    
 
     
 

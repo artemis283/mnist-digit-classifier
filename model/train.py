@@ -5,7 +5,7 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import numpy as np
 
-# Define the improved CNN-based classifier
+# CNN model with batch normalization
 class ImprovedCNNClassifier(nn.Module):
     def __init__(self):
         super(ImprovedCNNClassifier, self).__init__()
@@ -54,26 +54,26 @@ class ImprovedCNNClassifier(nn.Module):
 # Data augmentation for training
 transform_train = transforms.Compose([
     # Spatial transformations
-    transforms.RandomRotation(15),  # Increased rotation range to ±15 degrees
+    transforms.RandomRotation(15), 
     transforms.RandomAffine(
         degrees=10,  
-        translate=(0.15, 0.15),  # Increased translation range to 15%
-        scale=(0.85, 1.15),  # Add random scaling between 85% and 115%
-        shear=10  # Add shearing transformation
+        translate=(0.15, 0.15), 
+        scale=(0.85, 1.15), 
+        shear=10  
     ),
-    transforms.RandomPerspective(distortion_scale=0.2, p=0.5),  # Increased perspective distortion
+    transforms.RandomPerspective(distortion_scale=0.2, p=0.5),  
     
-    # Elastic transformations (simulates hand-writing variations)
+   
     transforms.ElasticTransform(alpha=1.0, sigma=0.5),
     
-    # Noise and blur to simulate different writing instruments
+    
     transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 1.0)),
     
-    # Convert to tensor and normalize
+    
     transforms.ToTensor(),
     transforms.Normalize((0.5,), (0.5,)),
     
-    # Add random noise occasionally 
+    
     transforms.RandomApply([
         transforms.Lambda(lambda x: x + 0.05 * torch.randn_like(x))
     ], p=0.3)
@@ -152,7 +152,7 @@ for epoch in range(epochs):
     
     print(f"Validation Loss: {avg_val_loss:.4f}, Validation Accuracy: {val_acc:.2f}%")
     
-    # Update scheduler based on validation loss
+
     scheduler.step(avg_val_loss)
     
     # Save best model
